@@ -1,0 +1,538 @@
+:root {
+  --bg: #1b1d23;
+  --bg-2: #22252d;
+  --bg-3: #2a2e38;
+  --term-bg: #14161b;
+  --border: #333844;
+  --text: #d7dae0;
+  --muted: #8b91a0;
+  --accent: #7aa2f7;
+  --accent-bg: #2d3b5c;
+  --danger: #f7768e;
+  --ok: #9ece6a;
+  --radius: 6px;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 'Segoe UI', system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+}
+
+body.resizing {
+  cursor: row-resize;
+}
+
+input,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  outline: none;
+  user-select: text;
+  min-width: 0;
+}
+
+input:focus {
+  border-color: var(--accent);
+}
+
+button {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+button:hover:not(:disabled) {
+  border-color: #4a5060;
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #10131a;
+  font-weight: 600;
+}
+
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #10131a;
+  font-weight: 600;
+}
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0 4px;
+  color: var(--accent);
+}
+
+code,
+.mono {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+}
+
+code {
+  background: var(--bg);
+  padding: 1px 4px;
+  border-radius: 4px;
+  user-select: text;
+  word-break: break-all;
+}
+
+.muted {
+  color: var(--muted);
+}
+.small {
+  font-size: 12px;
+}
+.grow {
+  flex: 1;
+}
+.hstack {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.danger-text {
+  color: var(--danger);
+}
+
+.error {
+  color: var(--danger);
+}
+
+.error.banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #3a2028;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  user-select: text;
+}
+
+/* --- Tela de conexão ---------------------------------------------------- */
+
+.connect-screen {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.connect-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.connect-card h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.connect-card p {
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.field.port {
+  width: 80px;
+}
+
+.segmented {
+  display: flex;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px;
+}
+
+.segmented button {
+  flex: 1;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+
+.segmented button.active {
+  background: var(--bg-3);
+  color: var(--text);
+}
+
+button.big {
+  padding: 9px;
+  margin-top: 4px;
+}
+
+/* --- Workspace ----------------------------------------------------------- */
+
+.workspace {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.explorer {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+  position: relative;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-buttons {
+  display: flex;
+  gap: 2px;
+}
+
+.nav-buttons button {
+  width: 30px;
+  padding: 4px 0;
+}
+
+.pathbar {
+  flex: 1;
+  height: 30px;
+  min-width: 0;
+}
+
+.crumbs {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0 4px;
+  overflow: hidden;
+  cursor: text;
+  white-space: nowrap;
+}
+
+.crumb {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+}
+
+.crumb:hover {
+  background: var(--bg-3);
+}
+
+.sep {
+  color: var(--muted);
+}
+
+.host-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  max-width: 280px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* --- Lista de arquivos --------------------------------------------------- */
+
+.filelist {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.filelist.loading {
+  opacity: 0.6;
+}
+
+.filelist.drop-here {
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+  background: rgba(122, 162, 247, 0.05);
+}
+
+.row-head,
+.row {
+  display: grid;
+  grid-template-columns: 36px minmax(160px, 1fr) 90px 140px 80px;
+  align-items: center;
+  padding: 0 12px;
+}
+
+.row-head {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  z-index: 1;
+}
+
+.th {
+  background: none;
+  border: none;
+  text-align: left;
+  color: var(--muted);
+  padding: 6px 0;
+  font-size: 12px;
+}
+
+.row {
+  height: 28px;
+  cursor: default;
+}
+
+.row:hover {
+  background: var(--bg-2);
+}
+
+.row.selected {
+  background: var(--accent-bg);
+}
+
+.row.drop-into {
+  background: var(--accent-bg);
+  outline: 1px solid var(--accent);
+}
+
+.col-icon {
+  font-size: 14px;
+}
+
+.empty {
+  padding: 40px;
+  text-align: center;
+}
+
+/* --- Terminal ------------------------------------------------------------ */
+
+.splitter {
+  height: 5px;
+  cursor: row-resize;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.splitter:hover {
+  background: var(--accent);
+}
+
+.terminal-pane {
+  background: var(--term-bg);
+  flex-shrink: 0;
+  padding: 4px 0 0 8px;
+}
+
+.terminal-host {
+  height: 100%;
+  user-select: text;
+}
+
+/* --- Status bar e transferências ---------------------------------------- */
+
+.statusbar {
+  height: 28px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px;
+  background: var(--bg-2);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+}
+
+.transfers {
+  position: relative;
+}
+
+.transfers-panel {
+  position: absolute;
+  bottom: 30px;
+  right: 0;
+  width: 380px;
+  max-height: 360px;
+  overflow: auto;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+
+.transfers-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.transfer {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.transfer-line {
+  display: flex;
+  gap: 6px;
+}
+
+.bar {
+  height: 4px;
+  background: var(--bg);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+
+.bar > div {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.15s;
+}
+
+.transfer.done .bar > div {
+  background: var(--ok);
+}
+
+.transfer.error .bar > div {
+  background: var(--danger);
+}
+
+/* --- Menu de contexto e modais ------------------------------------------- */
+
+.context-menu {
+  position: fixed;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  min-width: 180px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 30;
+}
+
+.context-menu li {
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.context-menu li:hover {
+  background: var(--bg-3);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 16px;
+}
+
+.modal {
+  width: 100%;
+  max-width: 460px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.modal h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.modal-body p {
+  margin: 0 0 10px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
