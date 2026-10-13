@@ -151,9 +151,108 @@ code {
 
 .connect-screen {
   height: 100%;
-  display: grid;
-  place-items: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
   padding: 16px;
+  overflow: auto;
+}
+
+.connect-layout {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 716px;
+  margin: auto;
+}
+
+.saved-list {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.saved-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.saved-empty {
+  padding: 14px;
+  margin: 0;
+}
+
+.saved-list > .saved-item:last-child {
+  border-bottom: none;
+}
+
+.saved-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  outline: none;
+}
+
+.saved-item:hover,
+.saved-item:focus-visible {
+  background: var(--bg-3);
+}
+
+.saved-item.active {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.saved-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+}
+
+.saved-item:hover .saved-actions,
+.saved-item:focus-within .saved-actions {
+  opacity: 1;
+}
+
+button.icon {
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  color: var(--muted);
+}
+
+button.icon:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.checks {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .connect-layout {
+    flex-direction: column;
+    max-width: 420px;
+  }
+  .saved-list {
+    width: 100%;
+    max-height: 240px;
+  }
 }
 
 .connect-card {

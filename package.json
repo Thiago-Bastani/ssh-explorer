@@ -30,5 +30,35 @@
     "react-dom": "^19.3.0",
     "typescript": "^7.0.2",
     "vite": "^7.3.7"
+  },
+  "author": "Thiago Bastani",
+  "build": {
+    "appId": "com.thiagobastani.sshexplorer",
+    "productName": "SSH Explorer",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "out/**",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "SSH Explorer"
+    }
   }
 }

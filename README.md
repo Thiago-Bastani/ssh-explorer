@@ -7,6 +7,7 @@ Explorador de arquivos + terminal sobre **uma única conexão SSH** (porta 22).
 - Transferências via SFTP; se o servidor não tiver o subsistema sftp, cai automaticamente para `scp` pelo canal exec
 - Verificação de host key (fingerprint SHA256), salva em `%APPDATA%/ssh-explorer/known_hosts.json`
 - Autenticação por senha, chave privada ou ssh-agent do Windows
+- Conexões salvas em `%APPDATA%/ssh-explorer/connections.json`; senhas/passphrases criptografadas com `safeStorage` (DPAPI) e nunca enviadas para a UI
 
 ## Rodar
 

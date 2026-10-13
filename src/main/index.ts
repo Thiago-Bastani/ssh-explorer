@@ -3,8 +3,9 @@ import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import type { ConnectOptions, HostKeyPrompt } from '@shared/types'
+import type { ConnectOptions, ConnectResult, HostKeyPrompt, SaveConnectionRequest } from '@shared/types'
 import { Session } from './session'
+import * as connections from './connections'
 
 let win: BrowserWindow | null = null
 let session: Session | null = null
@@ -49,22 +50,33 @@ function requireSession(): Session {
   return session
 }
 
+async function connect(opts: ConnectOptions): Promise<ConnectResult> {
+  session?.close()
+  const s = new Session({
+    verifyHostKey: (fp) => verifyHostKey(opts.host, opts.port, fp),
+    termData: (d) => win?.webContents.send('term:data', d),
+    transfer: (t) => win?.webContents.send('transfer', t),
+    disconnected: (reason) => {
+      if (session === s) session = null
+      win?.webContents.send('disconnected', reason)
+    }
+  })
+  const result = await s.connect(opts)
+  session = s
+  return result
+}
+
 function registerIpc(): void {
-  ipcMain.handle('connect', async (_e, opts: ConnectOptions) => {
-    session?.close()
-    const s = new Session({
-      verifyHostKey: (fp) => verifyHostKey(opts.host, opts.port, fp),
-      termData: (d) => win?.webContents.send('term:data', d),
-      transfer: (t) => win?.webContents.send('transfer', t),
-      disconnected: (reason) => {
-        if (session === s) session = null
-        win?.webContents.send('disconnected', reason)
-      }
-    })
-    const result = await s.connect(opts)
-    session = s
+  ipcMain.handle('connect', (_e, opts: ConnectOptions) => connect(opts))
+  ipcMain.handle('connect-saved', async (_e, id: string) => {
+    const result = await connect(connections.resolveSaved(id))
+    connections.touch(id)
     return result
   })
+  ipcMain.handle('saved:list', () => connections.listSaved())
+  ipcMain.handle('saved:save', (_e, req: SaveConnectionRequest) => connections.saveConnection(req))
+  ipcMain.handle('saved:delete', (_e, id: string) => connections.deleteSaved(id))
+  ipcMain.handle('saved:can-encrypt', () => connections.canRememberSecrets())
 
   ipcMain.handle('disconnect', () => {
     session?.close()

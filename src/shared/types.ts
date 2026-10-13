@@ -13,6 +13,29 @@ export interface ConnectOptions {
   passphrase?: string
 }
 
+/** Conexão salva como a UI enxerga: sem senha, só a indicação de que existe uma. */
+export interface SavedConnection {
+  id: string
+  name: string
+  host: string
+  port: number
+  username: string
+  auth: AuthMethod
+  keyPath?: string
+  /** Há senha (ou passphrase da chave) guardada, criptografada no main. */
+  hasSecret: boolean
+  lastUsed?: number
+}
+
+export interface SaveConnectionRequest {
+  /** Presente ao editar uma conexão existente. */
+  id?: string
+  name: string
+  opts: ConnectOptions
+  /** Guardar a senha/passphrase. Vazia ao editar = manter a que já estava salva. */
+  rememberSecret: boolean
+}
+
 export type EntryType = 'dir' | 'file' | 'other'
 
 export interface RemoteEntry {
@@ -54,7 +77,16 @@ export interface TransferProgress {
 
 export interface Api {
   connect(opts: ConnectOptions): Promise<ConnectResult>
+  /** Conecta usando a senha guardada (descriptografada só no main). */
+  connectSaved(id: string): Promise<ConnectResult>
   disconnect(): Promise<void>
+
+  listSaved(): Promise<SavedConnection[]>
+  saveConnection(req: SaveConnectionRequest): Promise<SavedConnection>
+  deleteSaved(id: string): Promise<void>
+  /** false se o SO não oferece criptografia (aí senhas não são guardadas). */
+  canRememberSecrets(): Promise<boolean>
+
   list(path: string): Promise<RemoteEntry[]>
   mkdir(path: string): Promise<void>
   rename(from: string, to: string): Promise<void>

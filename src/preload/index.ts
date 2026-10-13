@@ -10,7 +10,12 @@ function on<T>(channel: string, cb: (payload: T) => void): () => void {
 
 const api: Api = {
   connect: (opts) => ipcRenderer.invoke('connect', opts),
+  connectSaved: (id) => ipcRenderer.invoke('connect-saved', id),
   disconnect: () => ipcRenderer.invoke('disconnect'),
+  listSaved: () => ipcRenderer.invoke('saved:list'),
+  saveConnection: (req) => ipcRenderer.invoke('saved:save', req),
+  deleteSaved: (id) => ipcRenderer.invoke('saved:delete', id),
+  canRememberSecrets: () => ipcRenderer.invoke('saved:can-encrypt'),
   list: (p) => ipcRenderer.invoke('list', p),
   mkdir: (p) => ipcRenderer.invoke('mkdir', p),
   rename: (from, to) => ipcRenderer.invoke('rename', from, to),
