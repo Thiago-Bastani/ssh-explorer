@@ -183,17 +183,39 @@ class ChannelReader {
   }
 }
 
+/**
+ * Modo sudo. `password` ausente = servidor com NOPASSWD.
+ * Com senha, ela vai pelo stdin (`sudo -S`), nunca na linha de comando (apareceria no `ps`).
+ * `-k` ignora credenciais em cache: assim o sudo SEMPRE lê a senha primeiro e o resto do
+ * stdin chega intacto ao comando (essencial para o `scp -t` receber os dados do upload).
+ */
+export interface SudoMode {
+  password?: string
+}
+
+export function sudoWrap(cmd: string, sudo: SudoMode): string {
+  const prefix = sudo.password === undefined ? 'sudo -n' : "sudo -S -k -p ''"
+  return `${prefix} -- sh -c ${shq(cmd)}`
+}
+
 export class ScpBackend implements FileBackend {
   readonly kind = 'scp'
-  constructor(private conn: Client) {}
+  constructor(
+    private conn: Client,
+    private sudo?: SudoMode
+  ) {}
 
-  private open(cmd: string): Promise<ClientChannel> {
-    return p((cb) => this.conn.exec(cmd, cb))
+  private async open(cmd: string): Promise<ClientChannel> {
+    const ch = await p<ClientChannel>((cb) => this.conn.exec(this.sudo ? sudoWrap(cmd, this.sudo) : cmd, cb))
+    // O sudo lê a senha caractere a caractere até o \n; o que vier depois é do comando.
+    if (this.sudo?.password !== undefined) ch.write(this.sudo.password + '\n')
+    return ch
   }
 
   /** Roda um comando e devolve o stdout; rejeita se o exit code != 0. */
   private async run(cmd: string): Promise<string> {
     const ch = await this.open(cmd)
+    ch.end() // nenhum desses comandos lê stdin
     return new Promise((resolve, reject) => {
       const out: Buffer[] = []
       const err: Buffer[] = []

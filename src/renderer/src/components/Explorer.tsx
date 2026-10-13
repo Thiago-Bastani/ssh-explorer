@@ -45,6 +45,11 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
   const [dialog, setDialog] = useState<Dialog>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null) // '' = pasta atual
+  const [sudo, setSudo] = useState(false)
+  /** Pasta que falhou por falta de permissão (oferece "Tentar com sudo"). */
+  const [deniedDir, setDeniedDir] = useState<string | null>(null)
+  /** Pedido de senha do sudo em aberto; `then` roda depois de ativar. */
+  const [sudoPrompt, setSudoPrompt] = useState<{ error?: string; then?: () => void } | null>(null)
   const history = useRef<{ back: string[]; fwd: string[] }>({ back: [], fwd: [] })
   const cwdRef = useRef(cwd)
   const listRef = useRef<HTMLDivElement>(null)
@@ -65,9 +70,12 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
       setCwd(dir)
       setEntries(list)
       setError(null)
+      setDeniedDir(null)
       return true
     } catch (e) {
-      setError(`${dir}: ${errMsg(e)}`)
+      const msg = errMsg(e)
+      setError(`${dir}: ${msg}`)
+      setDeniedDir(/permission denied|permissão negada/i.test(msg) ? dir : null)
       return false
     } finally {
       setLoading(false)
@@ -143,6 +151,33 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
     } catch (e) {
       setError(errMsg(e))
     }
+    refresh()
+  }
+
+  /** Liga o sudo; se o servidor pedir senha, abre o prompt e tenta de novo. */
+  const enableSudo = async (then?: () => void, password?: string): Promise<void> => {
+    try {
+      const res = await api.setSudo(true, password)
+      if (res.ok) {
+        setSudo(true)
+        setSudoPrompt(null)
+        if (then) then()
+        else refresh()
+      } else if (res.needPassword) {
+        setSudoPrompt({ error: res.error, then })
+      } else {
+        setSudoPrompt(null)
+        setError(res.error ?? 'Não foi possível ativar o sudo')
+      }
+    } catch (e) {
+      setError(errMsg(e))
+    }
+  }
+
+  const toggleSudo = async (on: boolean): Promise<void> => {
+    if (on) return enableSudo()
+    await api.setSudo(false)
+    setSudo(false)
     refresh()
   }
 
@@ -335,6 +370,13 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
           Excluir
         </button>
         <span className="grow" />
+        <label
+          className={`toggle sudo-toggle ${sudo ? 'on' : ''}`}
+          title="Operações de arquivo com sudo (o terminal não é afetado)"
+        >
+          <input type="checkbox" checked={sudo} onChange={(e) => toggleSudo(e.target.checked)} />
+          sudo
+        </label>
         <label className="toggle" title="Mostrar arquivos que começam com ponto">
           <input
             type="checkbox"
@@ -355,7 +397,12 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
 
       {error && (
         <div className="error banner">
-          {error}
+          <span className="grow">{error}</span>
+          {deniedDir && !sudo && (
+            <button className="link" onClick={() => enableSudo(() => navigate(deniedDir))}>
+              Tentar com sudo
+            </button>
+          )}
           <button className="link" onClick={() => setError(null)}>
             ✕
           </button>
@@ -452,6 +499,18 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
             </>
           )}
         </ul>
+      )}
+
+      {sudoPrompt && (
+        <PromptModal
+          title="Senha do sudo"
+          label="Senha do seu usuário no servidor (fica só em memória até desconectar)"
+          password
+          error={sudoPrompt.error}
+          confirm="Ativar sudo"
+          onClose={() => setSudoPrompt(null)}
+          onSubmit={(pw) => enableSudo(sudoPrompt.then, pw)}
+        />
       )}
 
       {dialog?.kind === 'mkdir' && (

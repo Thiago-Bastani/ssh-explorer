@@ -83,7 +83,8 @@ function registerIpc(): void {
     session = null
   })
 
-  ipcMain.handle('list', (_e, dir: string) => requireSession().list(dir))
+  ipcMain.handle('sudo', (_e, enabled: boolean, password?: string) => requireSession().setSudo(enabled, password))
+  ipcMain.handle('list',(_e, dir: string) => requireSession().list(dir))
   ipcMain.handle('mkdir', (_e, dir: string) => requireSession().mkdir(dir))
   ipcMain.handle('rename', (_e, from: string, to: string) => requireSession().rename(from, to))
   ipcMain.handle('remove', (_e, target: string, isDir: boolean) => requireSession().remove(target, isDir))

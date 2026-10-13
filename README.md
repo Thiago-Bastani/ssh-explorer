@@ -7,6 +7,7 @@ Explorador de arquivos + terminal sobre **uma única conexão SSH** (porta 22).
 - Transferências via SFTP; se o servidor não tiver o subsistema sftp, cai automaticamente para `scp` pelo canal exec
 - Verificação de host key (fingerprint SHA256), salva em `%APPDATA%/ssh-explorer/known_hosts.json`
 - Autenticação por senha, chave privada ou ssh-agent do Windows
+- Modo **sudo** para as operações de arquivo (listar, enviar, baixar, renomear, excluir). Como o SFTP sempre roda como o usuário logado, com sudo os comandos passam pelo canal exec (`sudo -S` com a senha via stdin, ou `sudo -n` se houver NOPASSWD). A senha do login é reaproveitada; senão é pedida e fica só em memória. O terminal não é afetado.
 - Conexões salvas em `%APPDATA%/ssh-explorer/connections.json`; senhas/passphrases criptografadas com `safeStorage` (DPAPI) e nunca enviadas para a UI
 
 ## Rodar

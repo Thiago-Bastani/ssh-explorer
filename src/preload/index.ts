@@ -16,6 +16,7 @@ const api: Api = {
   saveConnection: (req) => ipcRenderer.invoke('saved:save', req),
   deleteSaved: (id) => ipcRenderer.invoke('saved:delete', id),
   canRememberSecrets: () => ipcRenderer.invoke('saved:can-encrypt'),
+  setSudo: (enabled, password) => ipcRenderer.invoke('sudo', enabled, password),
   list: (p) => ipcRenderer.invoke('list', p),
   mkdir: (p) => ipcRenderer.invoke('mkdir', p),
   rename: (from, to) => ipcRenderer.invoke('rename', from, to),

@@ -36,6 +36,11 @@ export interface SaveConnectionRequest {
   rememberSecret: boolean
 }
 
+export type SudoResult =
+  | { ok: true }
+  /** needPassword: a UI deve pedir a senha do sudo e tentar de novo. */
+  | { ok: false; needPassword: boolean; error?: string }
+
 export type EntryType = 'dir' | 'file' | 'other'
 
 export interface RemoteEntry {
@@ -87,6 +92,8 @@ export interface Api {
   /** false se o SO não oferece criptografia (aí senhas não são guardadas). */
   canRememberSecrets(): Promise<boolean>
 
+  /** Liga/desliga sudo nas operações de arquivo (não afeta o terminal). */
+  setSudo(enabled: boolean, password?: string): Promise<SudoResult>
   list(path: string): Promise<RemoteEntry[]>
   mkdir(path: string): Promise<void>
   rename(from: string, to: string): Promise<void>

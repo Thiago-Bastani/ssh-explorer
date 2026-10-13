@@ -635,3 +635,22 @@ button.big {
   gap: 8px;
   margin-top: 16px;
 }
+
+/* --- sudo ----------------------------------------------------------------- */
+
+.sudo-toggle {
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+}
+
+.sudo-toggle.on {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: rgba(247, 118, 142, 0.1);
+  font-weight: 600;
+}
+
+.error.banner .link {
+  margin-left: 8px;
+}

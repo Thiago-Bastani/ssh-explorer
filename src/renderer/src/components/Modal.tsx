@@ -32,6 +32,9 @@ export function PromptModal(props: {
   title: string
   label: string
   initial?: string
+  /** Campo de senha: sem trim, sem texto visível. */
+  password?: boolean
+  error?: string
   confirm: string
   onSubmit(value: string): void
   onClose(): void
@@ -50,7 +53,7 @@ export function PromptModal(props: {
   }, [])
 
   const submit = (): void => {
-    const v = value.trim()
+    const v = props.password ? value : value.trim()
     if (v) props.onSubmit(v)
   }
 
@@ -71,11 +74,13 @@ export function PromptModal(props: {
         <span>{props.label}</span>
         <input
           ref={input}
+          type={props.password ? 'password' : 'text'}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
         />
       </label>
+      {props.error && <p className="error small">{props.error}</p>}
     </Modal>
   )
 }
