@@ -208,8 +208,11 @@ export class Session {
           const b = this.backend // ligar/desligar o sudo no meio não troca o backend da transferência
           const plan = await planLocal(local, rjoin(remoteDir, path.basename(local)))
           report.total(plan.bytes)
-          for (const dir of plan.dirs) await b.mkdir(dir).catch(() => {}) // já existe: ok
-          for (const f of plan.files) await b.uploadFile(f.local, f.remote, report.add)
+          const limit = concurrencyFor(b)
+          // Pastas por nível (pai antes do filho), cada nível em paralelo.
+          for (const level of groupByDepth(plan.dirs))
+            await pool(level, limit, (dir) => b.mkdir(dir).catch(() => {})) // já existe: ok
+          await pool(plan.files, limit, (f) => b.uploadFile(f.local, f.remote, report.add))
         })
       )
     )
@@ -223,8 +226,8 @@ export class Session {
           const b = this.backend
           const plan = await planRemote(b, remote, path.join(localDir, safeLocalName(path.posix.basename(remote))))
           report.total(plan.bytes)
-          for (const dir of plan.dirs) await fs.promises.mkdir(dir, { recursive: true })
-          for (const f of plan.files) await b.downloadFile(f.remote, f.local, report.add)
+          await pool(plan.dirs, 16, (dir) => fs.promises.mkdir(dir, { recursive: true }))
+          await pool(plan.files, concurrencyFor(b), (f) => b.downloadFile(f.remote, f.local, report.add))
         })
       )
     )
@@ -267,6 +270,41 @@ export class Session {
       throw e
     }
   }
+}
+
+/**
+ * SFTP multiplexa várias requisições no mesmo canal, então dá para ter muitos arquivos em voo.
+ * O scp abre um canal exec por arquivo e o sshd limita isso (MaxSessions, padrão 10),
+ * e a conexão ainda é usada pelo terminal, então fica mais baixo.
+ */
+const concurrencyFor = (b: FileBackend): number => (b.kind === 'sftp' ? 8 : 4)
+
+/** Roda `fn` em todos os itens com no máximo `limit` ao mesmo tempo; o primeiro erro interrompe a fila. */
+async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<unknown>): Promise<void> {
+  let next = 0
+  let failed = false
+  const worker = async (): Promise<void> => {
+    while (!failed && next < items.length) {
+      const item = items[next++]
+      try {
+        await fn(item)
+      } catch (e) {
+        failed = true
+        throw e
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+}
+
+/** Agrupa caminhos POSIX por profundidade, do mais raso ao mais fundo. */
+function groupByDepth(dirs: string[]): string[][] {
+  const levels = new Map<number, string[]>()
+  for (const d of dirs) {
+    const depth = d.split('/').length
+    levels.set(depth, [...(levels.get(depth) ?? []), d])
+  }
+  return [...levels.entries()].sort((a, b) => a[0] - b[0]).map(([, v]) => v)
 }
 
 interface Plan {
