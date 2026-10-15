@@ -4,6 +4,8 @@ import { Modal, PromptModal } from './Modal'
 import { api, errMsg, formatDate, formatSize, path, shq } from '../util'
 
 type SortKey = 'name' | 'size' | 'mtime'
+/** Médio = ícones grandes lado a lado (padrão), como a área de trabalho do Windows. */
+type ViewMode = 'medium' | 'small' | 'list'
 type Dialog =
   | { kind: 'mkdir' }
   | { kind: 'rename'; entry: RemoteEntry }
@@ -26,6 +28,35 @@ function loadPrefs(): { showHidden: boolean; syncTerm: boolean } {
   }
 }
 
+/** Ícone vetorial para as visualizações em grade. */
+function EntryIcon(props: { entry: RemoteEntry; size: number }): React.JSX.Element {
+  const { entry: e, size } = props
+  return (
+    <svg className="entry-icon" width={size} height={size} viewBox="0 0 48 48" aria-hidden>
+      {e.type === 'dir' ? (
+        <>
+          <path d="M4 12a3 3 0 0 1 3-3h10l4 4h20a3 3 0 0 1 3 3v22a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" fill="#e0a73c" />
+          <rect x="4" y="17" width="40" height="22" rx="3" fill="#f6c453" />
+        </>
+      ) : e.type === 'other' ? (
+        <path d="M24 5l17 19-17 19L7 24z" fill="none" stroke="#8b91a0" strokeWidth="3" strokeLinejoin="round" />
+      ) : (
+        <>
+          <path d="M11 4h18l10 10v28a2 2 0 0 1-2 2H11a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" fill="#c9cfdc" />
+          <path d="M29 4l10 10H31a2 2 0 0 1-2-2z" fill="#8b91a0" />
+          <path d="M15 24h18M15 30h18M15 36h12" stroke="#8b91a0" strokeWidth="2.5" strokeLinecap="round" />
+        </>
+      )}
+      {e.link && (
+        <g>
+          <circle cx="36" cy="38" r="9" fill="#1b1d23" />
+          <path d="M31 41l9-9m0 0h-6m6 0v6" stroke="#7aa2f7" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+      )}
+    </svg>
+  )
+}
+
 function icon(e: RemoteEntry): string {
   if (e.type === 'dir') return e.link ? '📁↗' : '📁'
   if (e.type === 'other') return '◇'
@@ -41,6 +72,8 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
   const [anchor, setAnchor] = useState<string | null>(null)
   const [sort, setSort] = useState<{ key: SortKey; desc: boolean }>({ key: 'name', desc: false })
   const [prefs, setPrefs] = useState(loadPrefs)
+  // De propósito fora de `prefs`: não é salvo. Cada sessão começa em 'medium'.
+  const [view, setView] = useState<ViewMode>('medium')
   const [editingPath, setEditingPath] = useState<string | null>(null)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
@@ -220,12 +253,23 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
     setAnchor(entry.name)
   }
 
+  const gridColumns = (): number => {
+    const el = listRef.current
+    return el ? getComputedStyle(el).gridTemplateColumns.split(' ').length : 1
+  }
+
   const onKeyDown = (e: React.KeyboardEvent): void => {
     if (dialog || editingPath !== null) return
     const idx = visible.findIndex((x) => x.name === anchor)
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    const arrows = ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight']
+    if (arrows.includes(e.key) && !e.altKey) {
       e.preventDefault()
-      const next = visible[Math.min(Math.max(idx + (e.key === 'ArrowDown' ? 1 : -1), 0), visible.length - 1)]
+      const grid = view !== 'list'
+      // Na grade, ←/→ andam 1 item e ↑/↓ andam uma linha inteira (nº de colunas).
+      if (!grid && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) return
+      const cols = grid ? gridColumns() : 1
+      const step = e.key === 'ArrowDown' ? cols : e.key === 'ArrowUp' ? -cols : e.key === 'ArrowRight' ? 1 : -1
+      const next = visible[Math.min(Math.max((idx < 0 ? -step : idx) + step, 0), visible.length - 1)]
       if (next) {
         setSelected(new Set([next.name]))
         setAnchor(next.name)
@@ -370,6 +414,37 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
           Excluir
         </button>
         <span className="grow" />
+        {view !== 'list' && (
+          <select
+            className="sort-select"
+            title="Ordenar por"
+            value={`${sort.key}:${sort.desc ? 'desc' : 'asc'}`}
+            onChange={(e) => {
+              const [key, dir] = e.target.value.split(':')
+              setSort({ key: key as SortKey, desc: dir === 'desc' })
+            }}
+          >
+            <option value="name:asc">Nome ▴</option>
+            <option value="name:desc">Nome ▾</option>
+            <option value="size:desc">Maiores</option>
+            <option value="size:asc">Menores</option>
+            <option value="mtime:desc">Mais recentes</option>
+            <option value="mtime:asc">Mais antigos</option>
+          </select>
+        )}
+        <div className="view-switch" role="group" aria-label="Tamanho dos ícones">
+          {(
+            [
+              ['medium', 'Médio', 'Ícones médios'],
+              ['small', 'Pequeno', 'Ícones pequenos'],
+              ['list', 'Lista', 'Lista detalhada']
+            ] as const
+          ).map(([mode, label, title]) => (
+            <button key={mode} title={title} className={view === mode ? 'on' : ''} onClick={() => setView(mode)}>
+              {label}
+            </button>
+          ))}
+        </div>
         <label
           className={`toggle sudo-toggle ${sudo ? 'on' : ''}`}
           title="Operações de arquivo com sudo (o terminal não é afetado)"
@@ -410,7 +485,7 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
       )}
 
       <div
-        className={`filelist ${dropTarget === '' ? 'drop-here' : ''} ${loading ? 'loading' : ''}`}
+        className={`filelist view-${view} ${dropTarget === '' ? 'drop-here' : ''} ${loading ? 'loading' : ''}`}
         ref={listRef}
         onDragOver={(e) => dragOver(e, '')}
         onDragLeave={(e) => {
@@ -425,6 +500,7 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
           setMenu({ x: e.clientX, y: e.clientY, entry: null })
         }}
       >
+        {view === 'list' && (
         <div className="row-head">
           <span className="col-icon" />
           {sortHeader('name', 'Nome')}
@@ -432,6 +508,7 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
           {sortHeader('mtime', 'Modificado')}
           <span className="th">Permissões</span>
         </div>
+        )}
 
         {visible.map((e) => {
           const isDropDir = e.type === 'dir' && dropTarget === e.name
@@ -439,7 +516,8 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
             <div
               key={e.name}
               data-name={e.name}
-              className={`row ${selected.has(e.name) ? 'selected' : ''} ${isDropDir ? 'drop-into' : ''}`}
+              className={`${view === 'list' ? 'row' : 'tile'} ${selected.has(e.name) ? 'selected' : ''} ${isDropDir ? 'drop-into' : ''}`}
+              title={view === 'list' ? undefined : `${e.name}${e.type === 'dir' ? '' : ` · ${formatSize(e.size)}`} · ${formatDate(e.mtime)}`}
               onClick={(ev) => {
                 ev.stopPropagation()
                 setMenu(null)
@@ -458,13 +536,22 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
               onDragOver={e.type === 'dir' ? (ev) => dragOver(ev, e.name) : undefined}
               onDrop={e.type === 'dir' ? (ev) => drop(ev, full(e)) : undefined}
             >
-              <span className="col-icon">{icon(e)}</span>
-              <span className="col-name ellipsis" title={e.name}>
-                {e.name}
-              </span>
-              <span className="col-size muted">{e.type === 'dir' ? '' : formatSize(e.size)}</span>
-              <span className="col-date muted">{formatDate(e.mtime)}</span>
-              <span className="col-mode muted mono">{e.mode}</span>
+              {view === 'list' ? (
+                <>
+                  <span className="col-icon">{icon(e)}</span>
+                  <span className="col-name ellipsis" title={e.name}>
+                    {e.name}
+                  </span>
+                  <span className="col-size muted">{e.type === 'dir' ? '' : formatSize(e.size)}</span>
+                  <span className="col-date muted">{formatDate(e.mtime)}</span>
+                  <span className="col-mode muted mono">{e.mode}</span>
+                </>
+              ) : (
+                <>
+                  <EntryIcon entry={e} size={view === 'medium' ? 48 : 20} />
+                  <span className="tile-name">{e.name}</span>
+                </>
+              )}
             </div>
           )
         })}

@@ -696,3 +696,107 @@ button.big {
 .log-line.error .log-kind {
   color: #f7768e;
 }
+
+/* --- Tamanho dos ícones ---------------------------------------------------- */
+
+.view-switch {
+  display: flex;
+}
+.view-switch button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.view-switch button:first-child {
+  border-radius: 6px 0 0 6px;
+  margin-left: 0;
+}
+.view-switch button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+.view-switch button.on {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+  color: var(--text);
+  position: relative;
+}
+
+.view-medium,
+.view-small {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 10px 12px;
+}
+.view-medium {
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+}
+.view-small {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 2px 8px;
+}
+.view-medium .empty,
+.view-small .empty {
+  grid-column: 1 / -1;
+}
+
+.tile {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  cursor: default;
+  min-width: 0;
+}
+.tile:hover {
+  background: var(--bg-2);
+}
+.tile.selected {
+  background: var(--accent-bg);
+}
+.tile.drop-into {
+  background: var(--accent-bg);
+  outline: 1px solid var(--accent);
+}
+.view-medium .tile {
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 10px 4px 8px;
+  text-align: center;
+}
+.view-small .tile {
+  gap: 8px;
+  padding: 3px 8px;
+}
+.entry-icon {
+  flex-shrink: 0;
+}
+.tile-name {
+  min-width: 0;
+  max-width: 100%;
+  font-size: 12.5px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.view-medium .tile-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.view-small .tile-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sort-select {
+  font-size: 12px;
+}
+select {
+  font: inherit;
+  color: inherit;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 4px 6px;
+  outline: none;
+}

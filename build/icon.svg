@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f3547"/>
+      <stop offset="1" stop-color="#14161b"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9bbcff"/>
+      <stop offset="1" stop-color="#6a8ff0"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="54" fill="url(#bg)"/>
+  <rect x="8.5" y="8.5" width="239" height="239" rx="53.5" fill="none" stroke="#ffffff" stroke-opacity=".08"/>
+  <!-- fundo da pasta, com a aba -->
+  <path d="M36 98V84a12 12 0 0 1 12-12h46l16 16h98a12 12 0 0 1 12 12v84a12 12 0 0 1-12 12H48a12 12 0 0 1-12-12z" fill="#4b70c8"/>
+  <!-- frente da pasta -->
+  <rect x="36" y="106" width="184" height="90" rx="12" fill="url(#front)"/>
+  <!-- prompt de terminal -->
+  <path d="M78 128l28 20-28 20" fill="none" stroke="#14161b" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M120 170h38" stroke="#14161b" stroke-width="13" stroke-linecap="round"/>
+</svg>
