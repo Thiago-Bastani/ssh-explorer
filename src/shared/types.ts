@@ -80,6 +80,17 @@ export interface TransferProgress {
   error?: string
 }
 
+/** Linha do log de operações: comando exec real, ou operação SFTP descrita. */
+export interface LogEntry {
+  id: number
+  /** epoch em ms */
+  ts: number
+  kind: 'exec' | 'sftp'
+  text: string
+  /** Falha (com a mensagem do servidor), registrada logo após a operação que falhou. */
+  error?: boolean
+}
+
 export interface Api {
   connect(opts: ConnectOptions): Promise<ConnectResult>
   /** Conecta usando a senha guardada (descriptografada só no main). */
@@ -117,4 +128,6 @@ export interface Api {
   answerHostKey(requestId: string, accept: boolean): void
   onTransfer(cb: (t: TransferProgress) => void): () => void
   onDisconnected(cb: (reason: string) => void): () => void
+  /** Recebe o log em lotes (o main agrupa a cada ~100 ms). */
+  onLog(cb: (batch: LogEntry[]) => void): () => void
 }

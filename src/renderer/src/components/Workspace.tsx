@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ConnectOptions, ConnectResult, TransferProgress } from '@shared/types'
+import type { ConnectOptions, ConnectResult, LogEntry, TransferProgress } from '@shared/types'
 import { Explorer } from './Explorer'
 import { Terminal } from './Terminal'
 import { Transfers } from './Transfers'
+import { LogPanel, LOG_LIMIT } from './LogPanel'
 import { api } from '../util'
 
 const TERM_HEIGHT_KEY = 'terminal-height'
@@ -22,6 +23,40 @@ export function Workspace(props: {
   })
   const [termOpen, setTermOpen] = useState(true)
   const dragging = useRef(false)
+
+  // O buffer fica num ref (anel de LOG_LIMIT linhas); o React só re-renderiza com o painel aberto.
+  const [logOpen, setLogOpen] = useState(false)
+  const [logItems, setLogItems] = useState<LogEntry[]>([])
+  const logBuf = useRef<LogEntry[]>([])
+  const [logErrors, setLogErrors] = useState(0)
+  const logOpenRef = useRef(false)
+  logOpenRef.current = logOpen
+
+  useEffect(
+    () =>
+      api.onLog((batch) => {
+        const buf = logBuf.current.concat(batch)
+        logBuf.current = buf.length > LOG_LIMIT ? buf.slice(-LOG_LIMIT) : buf
+        const errs = batch.filter((l) => l.error).length
+        if (errs) setLogErrors((n) => n + errs)
+        if (logOpenRef.current) setLogItems(logBuf.current)
+      }),
+    []
+  )
+
+  const toggleLog = useCallback(() => {
+    setLogOpen((o) => {
+      if (!o) setLogItems(logBuf.current)
+      setLogErrors(0)
+      return !o
+    })
+  }, [])
+
+  const clearLog = useCallback(() => {
+    logBuf.current = []
+    setLogItems([])
+    setLogErrors(0)
+  }, [])
 
   useEffect(
     () =>
@@ -92,9 +127,15 @@ export function Workspace(props: {
         </>
       )}
 
+      {logOpen && <LogPanel items={logItems} height={160} onClear={clearLog} />}
+
       <footer className="statusbar">
         <button className="link" onClick={() => setTermOpen((o) => !o)}>
           {termOpen ? '▾ Terminal' : '▸ Terminal'}
+        </button>
+        <button className="link" onClick={toggleLog}>
+          {logOpen ? '▾ Log' : '▸ Log'}
+          {!logOpen && logErrors > 0 && <span className="error"> ({logErrors} {logErrors === 1 ? 'erro' : 'erros'})</span>}
         </button>
         <span className="muted">
           SSH :{opts.port} · arquivos via {result.transport === 'sftp' ? 'SFTP' : 'scp (servidor sem sftp)'}

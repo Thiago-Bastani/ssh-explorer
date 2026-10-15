@@ -7,6 +7,8 @@ import type { Client, SFTPWrapper, ClientChannel, Stats } from 'ssh2'
 import type { EntryType, RemoteEntry } from '@shared/types'
 
 export type Progress = (bytes: number) => void
+/** Registra no log de operações. Nunca passar senhas aqui. */
+export type LogFn = (kind: 'exec' | 'sftp', text: string, error?: boolean) => void
 
 export interface FileBackend {
   readonly kind: 'sftp' | 'scp'
@@ -19,6 +21,32 @@ export interface FileBackend {
   /** onProgress recebe a quantidade de bytes transferidos desde a última chamada. */
   uploadFile(local: string, remote: string, onProgress: Progress): Promise<void>
   downloadFile(remote: string, local: string, onProgress: Progress): Promise<void>
+}
+
+/**
+ * Envolve um backend para registrar no log toda operação que falhar, com a mensagem do erro.
+ * As linhas de início ficam dentro dos backends; aqui entra só o resultado ruim.
+ */
+export function withErrorLog(inner: FileBackend, log: LogFn): FileBackend {
+  const kind = inner.kind === 'sftp' ? 'sftp' : 'exec'
+  const guard = async <T>(what: string, fn: () => Promise<T>): Promise<T> => {
+    try {
+      return await fn()
+    } catch (e) {
+      log(kind, `✗ ${what}: ${(e as Error).message || String(e)}`, true)
+      throw e
+    }
+  }
+  return {
+    kind: inner.kind,
+    home: () => guard('home', () => inner.home()),
+    list: (d) => guard(`list ${d}`, () => inner.list(d)),
+    mkdir: (d) => guard(`mkdir ${d}`, () => inner.mkdir(d)),
+    rename: (a, b) => guard(`rename ${a} → ${b}`, () => inner.rename(a, b)),
+    remove: (t, isDir) => guard(`remove ${t}`, () => inner.remove(t, isDir)),
+    uploadFile: (l, r, pr) => guard(`put ${l} → ${r}`, () => inner.uploadFile(l, r, pr)),
+    downloadFile: (r, l, pr) => guard(`get ${r} → ${l}`, () => inner.downloadFile(r, l, pr))
+  }
 }
 
 // Caminhos remotos são sempre POSIX, mesmo rodando no Windows.
@@ -42,13 +70,18 @@ function typeFromMode(mode: number): EntryType {
 
 export class SftpBackend implements FileBackend {
   readonly kind = 'sftp'
-  constructor(private sftp: SFTPWrapper) {}
+  constructor(
+    private sftp: SFTPWrapper,
+    private log: LogFn
+  ) {}
 
   home(): Promise<string> {
+    this.log('sftp', 'realpath .')
     return p<string>((cb) => this.sftp.realpath('.', cb))
   }
 
   async list(dir: string): Promise<RemoteEntry[]> {
+    this.log('sftp', `readdir ${dir}`)
     const items = await p<{ filename: string; attrs: Stats }[]>((cb) => this.sftp.readdir(dir, cb))
     return Promise.all(
       items.map(async ({ filename, attrs }) => {
@@ -71,24 +104,31 @@ export class SftpBackend implements FileBackend {
   }
 
   mkdir(dir: string): Promise<void> {
+    this.log('sftp', `mkdir ${dir}`)
     return p((cb) => this.sftp.mkdir(dir, cb))
   }
 
   rename(from: string, to: string): Promise<void> {
+    this.log('sftp', `rename ${from} → ${to}`)
     return p((cb) => this.sftp.rename(from, to, cb))
   }
 
   async remove(target: string, isDir: boolean): Promise<void> {
-    if (!isDir) return p((cb) => this.sftp.unlink(target, cb))
+    if (!isDir) {
+      this.log('sftp', `unlink ${target}`)
+      return p((cb) => this.sftp.unlink(target, cb))
+    }
     for (const e of await this.list(target)) {
       // Não segue symlinks de pasta: remove só o link.
       await this.remove(rjoin(target, e.name), e.type === 'dir' && !e.link)
     }
+    this.log('sftp', `rmdir ${target}`)
     return p((cb) => this.sftp.rmdir(target, cb))
   }
 
   uploadFile(local: string, remote: string, onProgress: Progress): Promise<void> {
     let last = 0
+    this.log('sftp', `put ${local} → ${remote}`)
     return p((cb) =>
       this.sftp.fastPut(local, remote, {
         step: (total) => {
@@ -101,6 +141,7 @@ export class SftpBackend implements FileBackend {
 
   downloadFile(remote: string, local: string, onProgress: Progress): Promise<void> {
     let last = 0
+    this.log('sftp', `get ${remote} → ${local}`)
     return p((cb) =>
       this.sftp.fastGet(remote, local, {
         step: (total) => {
@@ -202,11 +243,15 @@ export class ScpBackend implements FileBackend {
   readonly kind = 'scp'
   constructor(
     private conn: Client,
+    private log: LogFn,
     private sudo?: SudoMode
   ) {}
 
   private async open(cmd: string): Promise<ClientChannel> {
-    const ch = await p<ClientChannel>((cb) => this.conn.exec(this.sudo ? sudoWrap(cmd, this.sudo) : cmd, cb))
+    // A senha do sudo vai pelo stdin, então o comando logado nunca a contém.
+    const full = this.sudo ? sudoWrap(cmd, this.sudo) : cmd
+    this.log('exec', full)
+    const ch = await p<ClientChannel>((cb) => this.conn.exec(full, cb))
     // O sudo lê a senha caractere a caractere até o \n; o que vier depois é do comando.
     if (this.sudo?.password !== undefined) ch.write(this.sudo.password + '\n')
     return ch

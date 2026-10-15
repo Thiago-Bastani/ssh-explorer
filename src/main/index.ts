@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
-import type { ConnectOptions, ConnectResult, HostKeyPrompt, SaveConnectionRequest } from '@shared/types'
+import type { ConnectOptions, ConnectResult, HostKeyPrompt, LogEntry, SaveConnectionRequest } from '@shared/types'
 import { Session } from './session'
 import * as connections from './connections'
 
@@ -43,6 +43,34 @@ async function verifyHostKey(host: string, port: number, fingerprint: string): P
   return accepted
 }
 
+// --- Log de operações ----------------------------------------------------------
+// Agrupa em lotes de ~100 ms: uma pasta com milhares de arquivos não gera milhares de IPCs.
+
+const LOG_FLUSH_MS = 100
+const LOG_MAX_BATCH = 200
+let logBuf: LogEntry[] = []
+let logSeq = 0
+let logTimer: NodeJS.Timeout | null = null
+
+function pushLog(kind: LogEntry['kind'], text: string, error?: boolean): void {
+  logBuf.push({ id: ++logSeq, ts: Date.now(), kind, text, ...(error && { error }) })
+  logTimer ??= setTimeout(flushLog, LOG_FLUSH_MS)
+}
+
+function flushLog(): void {
+  logTimer = null
+  let batch = logBuf
+  logBuf = []
+  if (batch.length > LOG_MAX_BATCH) {
+    const dropped = batch.length - LOG_MAX_BATCH
+    batch = [
+      { id: ++logSeq, ts: Date.now(), kind: 'sftp', text: `… ${dropped} operações omitidas` },
+      ...batch.slice(-LOG_MAX_BATCH)
+    ]
+  }
+  if (batch.length) win?.webContents.send('log', batch)
+}
+
 // --- IPC ----------------------------------------------------------------------
 
 function requireSession(): Session {
@@ -56,8 +84,10 @@ async function connect(opts: ConnectOptions): Promise<ConnectResult> {
     verifyHostKey: (fp) => verifyHostKey(opts.host, opts.port, fp),
     termData: (d) => win?.webContents.send('term:data', d),
     transfer: (t) => win?.webContents.send('transfer', t),
+    log: pushLog,
     disconnected: (reason) => {
       if (session === s) session = null
+      pushLog('sftp', `✗ desconectado: ${reason}`, true)
       win?.webContents.send('disconnected', reason)
     }
   })
@@ -83,7 +113,11 @@ function registerIpc(): void {
     session = null
   })
 
-  ipcMain.handle('sudo', (_e, enabled: boolean, password?: string) => requireSession().setSudo(enabled, password))
+  ipcMain.handle('sudo', async (_e, enabled: boolean, password?: string) => {
+    const r = await requireSession().setSudo(enabled, password)
+    if (!r.ok && r.error) pushLog('exec', `✗ sudo: ${r.error}`, true)
+    return r
+  })
   ipcMain.handle('list',(_e, dir: string) => requireSession().list(dir))
   ipcMain.handle('mkdir', (_e, dir: string) => requireSession().mkdir(dir))
   ipcMain.handle('rename', (_e, from: string, to: string) => requireSession().rename(from, to))

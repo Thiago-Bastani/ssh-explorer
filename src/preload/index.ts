@@ -36,7 +36,8 @@ const api: Api = {
   onHostKey: (cb) => on('hostkey:prompt', cb),
   answerHostKey: (id, accept) => ipcRenderer.send('hostkey:answer', id, accept),
   onTransfer: (cb) => on('transfer', cb),
-  onDisconnected: (cb) => on('disconnected', cb)
+  onDisconnected: (cb) => on('disconnected', cb),
+  onLog: (cb) => on('log', cb)
 }
 
 contextBridge.exposeInMainWorld('api', api)

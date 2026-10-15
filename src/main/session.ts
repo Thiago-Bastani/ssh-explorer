@@ -4,13 +4,14 @@ import crypto from 'node:crypto'
 import { randomUUID } from 'node:crypto'
 import { Client, type ClientChannel, type ConnectConfig } from 'ssh2'
 import type { ConnectOptions, ConnectResult, RemoteEntry, SudoResult, TransferProgress } from '@shared/types'
-import { SftpBackend, ScpBackend, rjoin, type FileBackend } from './backends'
+import { SftpBackend, ScpBackend, rjoin, withErrorLog, type FileBackend, type LogFn } from './backends'
 
 export interface SessionEvents {
   /** Pergunta ao usuário se confia no host key. */
   verifyHostKey(fingerprint: string): Promise<boolean>
   termData(data: string): void
   transfer(t: TransferProgress): void
+  log: LogFn
   disconnected(reason: string): void
 }
 
@@ -29,6 +30,8 @@ export class Session {
   private closedByUser = false
 
   constructor(private events: SessionEvents) {}
+
+  private log: LogFn = (kind, text) => this.events.log(kind, text)
 
   connect(opts: ConnectOptions): Promise<ConnectResult> {
     const config: ConnectConfig = {
@@ -72,7 +75,8 @@ export class Session {
         this.conn.on('error', (err) => this.events.disconnected(humanize(err)))
         this.conn.sftp(async (err, sftp) => {
           // Sem subsistema sftp no servidor → cai para scp/exec, ainda na mesma conexão.
-          this.backend = this.baseBackend = err ? new ScpBackend(this.conn) : new SftpBackend(sftp)
+          this.backend = this.baseBackend = err ? new ScpBackend(this.conn, this.log) : new SftpBackend(sftp, this.log)
+          this.backend = this.baseBackend = withErrorLog(this.baseBackend, this.log)
           try {
             resolve({ home: await this.backend.home(), transport: this.backend.kind })
           } catch (e) {
@@ -107,7 +111,7 @@ export class Session {
     // 1) NOPASSWD? Então nem precisa de senha.
     const probe = await this.execStatus('sudo -n true')
     if (probe.code === 0) {
-      this.backend = new ScpBackend(this.conn, {})
+      this.backend = withErrorLog(new ScpBackend(this.conn, this.log, {}), this.log)
       return { ok: true }
     }
     if (probe.code === 127 || /not found/i.test(probe.stderr)) {
@@ -124,7 +128,7 @@ export class Session {
     // stdin fechado logo após a senha: se estiver errada, o sudo não fica esperando outra.
     const check = await this.execStatus("sudo -S -k -p '' -- true", pw + '\n')
     if (check.code === 0) {
-      this.backend = new ScpBackend(this.conn, { password: pw })
+      this.backend = withErrorLog(new ScpBackend(this.conn, this.log, { password: pw }), this.log)
       return { ok: true }
     }
     if (/not in the sudoers|not allowed/i.test(check.stderr)) {
@@ -139,6 +143,7 @@ export class Session {
 
   /** Roda um comando avulso e devolve exit code + stderr (sem rejeitar). */
   private async execStatus(cmd: string, stdin?: string): Promise<{ code: number | null; stderr: string }> {
+    this.log('exec', cmd) // a senha (stdin) não entra no log
     const ch = await new Promise<ClientChannel>((resolve, reject) =>
       this.conn.exec(cmd, (err, c) => (err ? reject(err) : resolve(c)))
     )
@@ -148,7 +153,11 @@ export class Session {
       ch.on('data', () => {})
       ch.stderr.on('data', (d: Buffer) => err.push(d))
       ch.on('exit', (c: number | null) => (code = c))
-      ch.on('close', () => resolve({ code, stderr: Buffer.concat(err).toString('utf8') }))
+      ch.on('close', () => {
+        const stderr = Buffer.concat(err).toString('utf8')
+        if (code !== 0) this.log('exec', `✗ saiu com código ${code}${stderr.trim() ? `: ${stderr.trim()}` : ''}`, true)
+        resolve({ code, stderr })
+      })
       if (stdin) ch.write(stdin)
       ch.end()
     })
@@ -266,6 +275,7 @@ export class Session {
     } catch (e) {
       t.state = 'error'
       t.error = (e as Error).message
+      this.log('sftp', `✗ transferência de ${name}: ${t.error}`, true)
       emit(true)
       throw e
     }
