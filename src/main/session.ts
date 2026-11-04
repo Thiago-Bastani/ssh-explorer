@@ -4,7 +4,7 @@ import crypto from 'node:crypto'
 import { randomUUID } from 'node:crypto'
 import { Client, type ClientChannel, type ConnectConfig } from 'ssh2'
 import type { ConnectOptions, ConnectResult, RemoteEntry, SudoResult, TransferProgress } from '@shared/types'
-import { SftpBackend, ScpBackend, rjoin, withErrorLog, type FileBackend, type LogFn } from './backends'
+import { SftpBackend, ScpBackend, rjoin, withErrorLog, type FileBackend, type LogFn, type SudoMode } from './backends'
 
 export interface SessionEvents {
   /** Pergunta ao usuário se confia no host key. */
@@ -26,6 +26,8 @@ export class Session {
   private baseBackend!: FileBackend
   /** Senha do login, reaproveitada como senha do sudo. Só em memória. */
   private loginPassword?: string
+  /** Sudo ativo nas operações de arquivo (undefined = desligado). */
+  private sudoMode?: SudoMode
   private shell: ClientChannel | null = null
   private closedByUser = false
 
@@ -105,13 +107,15 @@ export class Session {
   async setSudo(enabled: boolean, password?: string): Promise<SudoResult> {
     if (!enabled) {
       this.backend = this.baseBackend
+      this.sudoMode = undefined
       return { ok: true }
     }
 
     // 1) NOPASSWD? Então nem precisa de senha.
     const probe = await this.execStatus('sudo -n true')
     if (probe.code === 0) {
-      this.backend = withErrorLog(new ScpBackend(this.conn, this.log, {}), this.log)
+      this.sudoMode = {}
+      this.backend = withErrorLog(new ScpBackend(this.conn, this.log, this.sudoMode), this.log)
       return { ok: true }
     }
     if (probe.code === 127 || /not found/i.test(probe.stderr)) {
@@ -128,7 +132,8 @@ export class Session {
     // stdin fechado logo após a senha: se estiver errada, o sudo não fica esperando outra.
     const check = await this.execStatus("sudo -S -k -p '' -- true", pw + '\n')
     if (check.code === 0) {
-      this.backend = withErrorLog(new ScpBackend(this.conn, this.log, { password: pw }), this.log)
+      this.sudoMode = { password: pw }
+      this.backend = withErrorLog(new ScpBackend(this.conn, this.log, this.sudoMode), this.log)
       return { ok: true }
     }
     if (/not in the sudoers|not allowed/i.test(check.stderr)) {
@@ -174,6 +179,26 @@ export class Session {
   }
   remove(target: string, isDir: boolean): Promise<void> {
     return this.backend.remove(target, isDir)
+  }
+
+  // --- Ler / editar arquivo: `cat` para ler, `cat >` para gravar ----------------
+
+  async readFile(target: string, maxBytes: number): Promise<Buffer> {
+    return this.logged(`cat ${target}`, () => new ScpBackend(this.conn, this.log, this.sudoMode).readFile(target, maxBytes))
+  }
+
+  async writeFile(target: string, data: Buffer): Promise<void> {
+    return this.logged(`gravar ${target}`, () => new ScpBackend(this.conn, this.log, this.sudoMode).writeFile(target, data))
+  }
+
+  /** Registra no log a falha de uma operação (o início já é logado pelo ScpBackend). */
+  private async logged<T>(what: string, fn: () => Promise<T>): Promise<T> {
+    try {
+      return await fn()
+    } catch (e) {
+      this.log('exec', `✗ ${what}: ${(e as Error).message || String(e)}`, true)
+      throw e
+    }
   }
 
   // --- Terminal --------------------------------------------------------------

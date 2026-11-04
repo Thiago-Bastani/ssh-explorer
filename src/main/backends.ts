@@ -257,21 +257,64 @@ export class ScpBackend implements FileBackend {
     return ch
   }
 
-  /** Roda um comando e devolve o stdout; rejeita se o exit code != 0. */
-  private async run(cmd: string): Promise<string> {
+  /**
+   * Roda um comando e devolve o stdout; rejeita se o exit code != 0.
+   * Com `maxBytes`, aborta (e rejeita) assim que a saída passar do limite.
+   */
+  private async runBuffer(cmd: string, maxBytes = Infinity): Promise<Buffer> {
     const ch = await this.open(cmd)
     ch.end() // nenhum desses comandos lê stdin
     return new Promise((resolve, reject) => {
       const out: Buffer[] = []
       const err: Buffer[] = []
+      let size = 0
+      let tooBig = false
       let code: number | null = null
-      ch.on('data', (d: Buffer) => out.push(d))
+      ch.on('data', (d: Buffer) => {
+        if (tooBig) return
+        size += d.length
+        if (size > maxBytes) {
+          tooBig = true
+          out.length = 0
+          ch.close()
+        } else out.push(d)
+      })
       ch.stderr.on('data', (d: Buffer) => err.push(d))
       ch.on('exit', (c: number | null) => (code = c))
       ch.on('close', () => {
-        if (code === 0) resolve(Buffer.concat(out).toString('utf8'))
+        if (tooBig) reject(new Error('Arquivo grande demais'))
+        else if (code === 0) resolve(Buffer.concat(out))
         else reject(new Error(Buffer.concat(err).toString('utf8').trim() || `comando falhou (código ${code})`))
       })
+    })
+  }
+
+  private async run(cmd: string): Promise<string> {
+    return (await this.runBuffer(cmd)).toString('utf8')
+  }
+
+  /** Lê o arquivo inteiro com `cat` (mesmo com sudo, se ativo). */
+  readFile(target: string, maxBytes: number): Promise<Buffer> {
+    return this.runBuffer(`cat -- ${shq(target)}`, maxBytes)
+  }
+
+  /**
+   * Sobrescreve o arquivo com `cat > arquivo`, o conteúdo vai pelo stdin.
+   * Arquivo existente mantém dono e permissões; se não existir, é criado.
+   */
+  async writeFile(target: string, data: Buffer): Promise<void> {
+    const ch = await this.open(`cat > ${shq(target)}`)
+    return new Promise((resolve, reject) => {
+      const err: Buffer[] = []
+      let code: number | null = null
+      ch.on('data', () => {})
+      ch.stderr.on('data', (d: Buffer) => err.push(d))
+      ch.on('exit', (c: number | null) => (code = c))
+      ch.on('close', () => {
+        if (code === 0) resolve()
+        else reject(new Error(Buffer.concat(err).toString('utf8').trim() || `comando falhou (código ${code})`))
+      })
+      ch.end(data)
     })
   }
 

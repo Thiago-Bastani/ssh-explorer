@@ -8,6 +8,8 @@ Explorador de arquivos + terminal sobre **uma única conexão SSH** (porta 22).
 - Verificação de host key (fingerprint SHA256), salva em `%APPDATA%/ssh-explorer/known_hosts.json`
 - Autenticação por senha, chave privada ou ssh-agent do Windows
 - Modo **sudo** para as operações de arquivo (listar, enviar, baixar, renomear, excluir). Como o SFTP sempre roda como o usuário logado, com sudo os comandos passam pelo canal exec (`sudo -S` com a senha via stdin, ou `sudo -n` se houver NOPASSWD). A senha do login é reaproveitada; senão é pedida e fica só em memória. O terminal não é afetado.
+- **Leitor** de imagens (png, jpg, gif, webp, svg…) e PDFs até 20 MB, e **editor de texto** básico (`.env`, `.txt`, configs…) até 1 MB. Duplo clique abre; no menu de contexto, "Editar como texto" serve para qualquer arquivo. Nada é instalado no servidor: ler é um `cat` e salvar é um `cat > arquivo` (o arquivo mantém dono e permissões). Com o modo sudo ligado, os dois comandos rodam com sudo. Ctrl+S salva.
+- **Copiar do terminal**: Ctrl+C copia quando há texto selecionado (sem seleção, interrompe como sempre), Ctrl+Shift+C / Ctrl+Insert também copiam, e o botão direito copia (com seleção) ou cola. Em programas que capturam o mouse (vim, tmux), segure Shift para selecionar.
 - Conexões salvas em `%APPDATA%/ssh-explorer/connections.json`; senhas/passphrases criptografadas com `safeStorage` (DPAPI) e nunca enviadas para a UI
 
 ## Rodar

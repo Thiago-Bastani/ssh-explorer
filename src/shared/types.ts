@@ -109,6 +109,13 @@ export interface Api {
   mkdir(path: string): Promise<void>
   rename(from: string, to: string): Promise<void>
   remove(path: string, isDir: boolean): Promise<void>
+  /** Lê o arquivo remoto inteiro (`cat`). Rejeita se passar de maxBytes. */
+  readFile(remotePath: string, maxBytes: number): Promise<Uint8Array>
+  /** Sobrescreve o arquivo remoto com o texto em UTF-8 (`cat >`). */
+  writeText(remotePath: string, text: string): Promise<void>
+  /** Clipboard do sistema (via main: mais confiável que navigator.clipboard). */
+  clipboardWrite(text: string): Promise<void>
+  clipboardRead(): Promise<string>
   /** Envia arquivos/pastas locais para remoteDir. */
   upload(localPaths: string[], remoteDir: string): Promise<void>
   /** Pergunta a pasta local de destino e baixa os itens. Retorna false se cancelado. */

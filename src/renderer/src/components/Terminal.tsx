@@ -19,19 +19,38 @@ export function Terminal(): React.JSX.Element {
     term.open(host.current!)
     fit.fit()
 
-    // Ctrl+Shift+C / Ctrl+Shift+V para copiar/colar, como nos terminais Linux.
+    // Copiar/colar pelo clipboard do sistema (via main, mais confiável que navigator.clipboard).
+    const copy = (): void => {
+      const sel = term.getSelection()
+      if (!sel) return
+      api.clipboardWrite(sel)
+      term.clearSelection()
+    }
+    const paste = (): void => {
+      api.clipboardRead().then((t) => t && term.paste(t))
+    }
+
     term.attachCustomKeyEventHandler((e) => {
-      if (e.type !== 'keydown' || !e.ctrlKey || !e.shiftKey) return true
-      if (e.code === 'KeyC') {
-        navigator.clipboard.writeText(term.getSelection())
+      if (e.type !== 'keydown') return true
+      // Ctrl+C com texto selecionado copia; sem seleção continua sendo o Ctrl+C (SIGINT) de sempre.
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.code === 'KeyC' && term.hasSelection()) {
+        copy()
         return false
       }
-      if (e.code === 'KeyV') {
-        navigator.clipboard.readText().then((t) => term.paste(t))
-        return false
-      }
+      if (e.ctrlKey && e.shiftKey && e.code === 'KeyC') return copy(), false
+      if (e.ctrlKey && e.shiftKey && e.code === 'KeyV') return paste(), false
+      if (e.ctrlKey && !e.shiftKey && e.code === 'Insert') return copy(), false
+      if (e.shiftKey && !e.ctrlKey && e.code === 'Insert') return paste(), false
       return true
     })
+
+    // Botão direito, como no Windows Terminal: com seleção copia, sem seleção cola.
+    const onContextMenu = (e: MouseEvent): void => {
+      e.preventDefault()
+      if (term.hasSelection()) copy()
+      else paste()
+    }
+    host.current!.addEventListener('contextmenu', onContextMenu)
 
     const offData = api.onTermData((d) => term.write(d))
     const input = term.onData((d) => api.termWrite(d))
@@ -44,7 +63,9 @@ export function Terminal(): React.JSX.Element {
     })
     ro.observe(host.current!)
 
+    const hostEl = host.current!
     return () => {
+      hostEl.removeEventListener('contextmenu', onContextMenu)
       ro.disconnect()
       input.dispose()
       offData()

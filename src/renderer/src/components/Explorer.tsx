@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RemoteEntry } from '@shared/types'
 import { Modal, PromptModal } from './Modal'
+import { FileViewer } from './FileViewer'
+import { TextEditor } from './TextEditor'
+import { fileKind } from '../fileTypes'
 import { api, errMsg, formatDate, formatSize, path, shq } from '../util'
 
 type SortKey = 'name' | 'size' | 'mtime'
@@ -77,6 +80,8 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
   const [editingPath, setEditingPath] = useState<string | null>(null)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [menu, setMenu] = useState<Menu | null>(null)
+  /** Arquivo aberto no leitor (imagem/PDF) ou no editor de texto. */
+  const [viewer, setViewer] = useState<{ mode: 'view' | 'edit'; entry: RemoteEntry } | null>(null)
   const [dropTarget, setDropTarget] = useState<string | null>(null) // '' = pasta atual
   const [sudo, setSudo] = useState(false)
   /** Pasta que falhou por falta de permissão (oferece "Tentar com sudo"). */
@@ -214,8 +219,12 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
     refresh()
   }
 
+  /** Pasta: entra. Texto: editor. Imagem/PDF: leitor. O resto: baixa. */
   const open = (e: RemoteEntry): void => {
-    if (e.type === 'dir') navigate(full(e))
+    if (e.type === 'dir') return void navigate(full(e))
+    const kind = fileKind(e.name)
+    if (kind === 'text') setViewer({ mode: 'edit', entry: e })
+    else if (kind) setViewer({ mode: 'view', entry: e })
     else download([e])
   }
 
@@ -259,7 +268,7 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
   }
 
   const onKeyDown = (e: React.KeyboardEvent): void => {
-    if (dialog || editingPath !== null) return
+    if (dialog || editingPath !== null || viewer) return
     const idx = visible.findIndex((x) => x.name === anchor)
     const arrows = ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight']
     if (arrows.includes(e.key) && !e.altKey) {
@@ -324,6 +333,10 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
     const parts = cwd.split('/').filter(Boolean)
     return [{ label: '/', path: '/' }, ...parts.map((p, i) => ({ label: p, path: '/' + parts.slice(0, i + 1).join('/') }))]
   }, [cwd])
+
+  const menuKind = menu?.entry && menu.entry.type !== 'dir' ? fileKind(menu.entry.name) : null
+  const menuOpenLabel =
+    menu?.entry?.type === 'dir' ? 'Abrir' : menuKind === 'text' ? 'Editar' : menuKind ? 'Visualizar' : 'Baixar'
 
   const sortHeader = (key: SortKey, label: string): React.JSX.Element => (
     <button className="th" onClick={() => setSort((s) => ({ key, desc: s.key === key ? !s.desc : false }))}>
@@ -565,8 +578,14 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
         <ul className="context-menu" style={{ left: menu.x, top: menu.y }} onClick={() => setMenu(null)}>
           {menu.entry ? (
             <>
-              <li onClick={() => open(menu.entry!)}>{menu.entry.type === 'dir' ? 'Abrir' : 'Baixar'}</li>
+              <li onClick={() => open(menu.entry!)}>{menuOpenLabel}</li>
               {menu.entry.type === 'dir' && <li onClick={() => download(selectedEntries)}>Baixar pasta</li>}
+              {menu.entry.type !== 'dir' && menuKind !== 'text' && (
+                <li onClick={() => setViewer({ mode: 'edit', entry: menu.entry! })}>Editar como texto</li>
+              )}
+              {menu.entry.type !== 'dir' && menuKind && menuOpenLabel !== 'Baixar' && (
+                <li onClick={() => download([menu.entry!])}>Baixar</li>
+              )}
               <li onClick={() => setDialog({ kind: 'rename', entry: menu.entry! })}>Renomear</li>
               <li onClick={() => navigator.clipboard.writeText(full(menu.entry!))}>Copiar caminho</li>
               {menu.entry.type === 'dir' && (
@@ -586,6 +605,27 @@ export function Explorer(props: { home: string; title: string; onDisconnect(): v
             </>
           )}
         </ul>
+      )}
+
+      {viewer?.mode === 'view' && (
+        <FileViewer
+          name={viewer.entry.name}
+          path={full(viewer.entry)}
+          size={viewer.entry.size}
+          kind={fileKind(viewer.entry.name) === 'pdf' ? 'pdf' : 'image'}
+          onClose={() => setViewer(null)}
+          onDownload={() => download([viewer.entry])}
+        />
+      )}
+
+      {viewer?.mode === 'edit' && (
+        <TextEditor
+          name={viewer.entry.name}
+          path={full(viewer.entry)}
+          size={viewer.entry.size}
+          onClose={() => setViewer(null)}
+          onSaved={refresh}
+        />
       )}
 
       {sudoPrompt && (

@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron'
 import type { ConnectOptions, ConnectResult, HostKeyPrompt, LogEntry, SaveConnectionRequest } from '@shared/types'
 import { Session } from './session'
 import * as connections from './connections'
@@ -122,6 +122,12 @@ function registerIpc(): void {
   ipcMain.handle('mkdir', (_e, dir: string) => requireSession().mkdir(dir))
   ipcMain.handle('rename', (_e, from: string, to: string) => requireSession().rename(from, to))
   ipcMain.handle('remove', (_e, target: string, isDir: boolean) => requireSession().remove(target, isDir))
+  ipcMain.handle('file:read', (_e, target: string, maxBytes: number) => requireSession().readFile(target, maxBytes))
+  ipcMain.handle('file:write', (_e, target: string, text: string) =>
+    requireSession().writeFile(target, Buffer.from(text, 'utf8'))
+  )
+  ipcMain.handle('clipboard:write', (_e, text: string) => clipboard.writeText(text))
+  ipcMain.handle('clipboard:read', () => clipboard.readText())
   ipcMain.handle('upload', (_e, locals: string[], remoteDir: string) => requireSession().upload(locals, remoteDir))
 
   ipcMain.handle('download', async (_e, remotes: string[]) => {
